@@ -2,7 +2,8 @@
 //!
 //! Values can be checked out when needed, operated on, and will automatically
 //! be returned to the pool when they go out of scope. It can be used when
-//! handling values that are expensive to create.
+//! handling values that are expensive to create. Based on the [object pool
+//! pattern](http://en.wikipedia.org/wiki/Object_pool_pattern).
 //!
 //! Example:
 //!
