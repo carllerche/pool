@@ -1,14 +1,60 @@
-//! A store of pre-initialized values.
+//! # A store of pre-initialized values.
 //!
 //! Values can be checked out when needed, operated on, and will automatically
 //! be returned to the pool when they go out of scope. It can be used when
 //! handling values that are expensive to create.
 //!
+//! Example:
+//!
+//! ```
+//! use pool::Pool;
+//! use std::thread;
+//!
+//! let mut pool = Pool::with_capacity(20, 0, || Vec::with_capacity(16_384));
+//!
+//! let mut vec = pool.checkout().unwrap();
+//!
+//! // Do some work with the value, this can happen in another thread
+//! thread::scoped(move || {
+//!     for i in 0..10_000 {
+//!         vec.push(i);
+//!     }
+//!
+//!     assert_eq!(10_000, vec.len());
+//! });
+//!
+//! // The vec will have been returned to the pool by now
+//! let vec = pool.checkout().unwrap();
+//!
+//! // The pool operates LIFO, so this vec will be the same value that was used
+//! // in the thread above. The value will also be left as it was when it was
+//! // returned to the pool, this may or may not be desirable depending on the
+//! // use case.
+//! assert_eq!(10_000, vec.len());
+//!
+//! ```
+//!
+//! ## Extra byte storage
+//!
+//! Each value in the pool can be padded with an arbitrary number of bytes that
+//! can be accessed as a slice. This is useful if implementing something like a
+//! pool of buffers. The metadata could be stored as the `Pool` value and the
+//! byte array can be stored in the padding.
+//!
+//! ## Threading
+//!
+//! Checking out values from the pool requires a mutable reference to the pool
+//! so cannot happen concurrently across threads, but returning values to the
+//! pool is thread safe and lock free, so if the value being pooled is `Sync`
+//! then `Checkout<T>` is `Sync` as well.
+//!
+//! The easiest way to have a single pool shared across many threads would be
+//! to wrap `Pool` in a mutex.
 use std::{mem, ops, ptr, usize};
 use std::sync::Arc;
 use std::sync::atomic::{self, AtomicUsize, Ordering};
 
-/// A pool of values
+/// A pool of reusable values
 pub struct Pool<T> {
     inner: Arc<PoolInner<T>>,
 }
@@ -55,19 +101,20 @@ impl<T> Pool<T> {
 
 unsafe impl<T: Send> Send for Pool<T> { }
 
-/// A handle to a checked out value
+/// A handle to a checked out value. When dropped out of scope, the value will
+/// be returned to the pool.
 pub struct Checkout<T> {
     entry: *mut Entry<T>,
     pool: Arc<PoolInner<T>>,
 }
 
 impl<T> Checkout<T> {
-    /// Extra bytes that can be read from
+    /// Read access to the raw bytes
     pub fn extra(&self) -> &[u8] {
         self.entry().extra()
     }
 
-    /// Extra bytes that can be written to
+    /// Write access to the extra bytes
     pub fn extra_mut(&self) -> &mut [u8] {
         self.entry_mut().extra_mut()
     }
