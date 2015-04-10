@@ -7,3 +7,28 @@ goes out of scope, the value is returned to the pool and made available
 for checkout at a later time.
 
 [![Build Status](https://travis-ci.org/carllerche/pool.svg?branch=master)](https://travis-ci.org/carllerche/pool)
+
+- [API documentation](http://carllerche.github.io/pool/pool/)
+
+- [Crates.io](https://crates.io/crates/pool)
+
+## Usage
+
+To use `pool`, first add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+pool = "0.1.1"
+```
+
+Then, add this to your crate root:
+
+```rust
+extern crate pool;
+```
+
+## Features
+
+* Simple
+* Lock-free: values can be returned to the pool across threads
+* Stores typed values and / or slabs of memory
