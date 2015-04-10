@@ -170,7 +170,17 @@ impl<T> PoolInner<T> {
         let mut idx = self.next.load(Ordering::Acquire);
 
         loop {
+            debug_assert!(idx <= self.count, "invalid index: {}", idx);
+
+            if idx == self.count {
+                // The pool is depleted
+                return None;
+            }
+
             let nxt = self.entry_mut(idx).next;
+
+            debug_assert!(nxt <= self.count, "invalid next index: {}", idx);
+
             let res = self.next.compare_and_swap(idx, nxt, Ordering::Relaxed);
 
             if res == idx {
@@ -182,11 +192,6 @@ impl<T> PoolInner<T> {
             idx = res;
         }
 
-        if idx == self.count {
-            // The pool is depleted
-            return None;
-        }
-
         Some(self.entry_mut(idx) as *mut Entry<T>)
     }
 
@@ -196,9 +201,11 @@ impl<T> PoolInner<T> {
 
         unsafe {
             // Figure out the index
-            idx = (ptr as usize) - (self.ptr as usize) / self.entry_size;
+            idx = ((ptr as usize) - (self.ptr as usize)) / self.entry_size;
             entry = mem::transmute(ptr);
         }
+
+        debug_assert!(idx < self.count, "invalid index; idx={}", idx);
 
         let mut nxt = self.next.load(Ordering::Relaxed);
 
@@ -218,9 +225,8 @@ impl<T> PoolInner<T> {
 
     fn entry(&self, idx: usize) -> &Entry<T> {
         unsafe {
-            let off = idx * self.entry_size;
-            let ptr = self.ptr.offset(off as isize);
-
+            debug_assert!(idx < self.count, "invalid index");
+            let ptr = self.ptr.offset(idx as isize);
             mem::transmute(ptr)
         }
     }

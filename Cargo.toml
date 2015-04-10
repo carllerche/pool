@@ -16,3 +16,8 @@ exclude       = [
   "deploy.sh",
   "test/**/*",
 ]
+
+[[test]]
+
+name = "test"
+path = "test/test.rs"
