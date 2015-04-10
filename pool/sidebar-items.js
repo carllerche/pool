@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Checkout","A handle to a checked out value. When dropped out of scope, the value will be returned to the pool."],["Pool","A pool of reusable values"]]});
