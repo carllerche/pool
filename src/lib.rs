@@ -13,7 +13,7 @@
 //!
 //! let mut pool = Pool::with_capacity(20, 0, || Vec::with_capacity(16_384));
 //!
-//! let mut vec = pool.checkout().unwrap();
+//! let mut vec = pool.checkout_raw().unwrap();
 //!
 //! // Do some work with the value, this can happen in another thread
 //! thread::scoped(move || {
@@ -25,7 +25,7 @@
 //! });
 //!
 //! // The vec will have been returned to the pool by now
-//! let vec = pool.checkout().unwrap();
+//! let vec = pool.checkout_raw().unwrap();
 //!
 //! // The pool operates LIFO, so this vec will be the same value that was used
 //! // in the thread above. The value will also be left as it was when it was
@@ -54,6 +54,9 @@
 use std::{mem, ops, ptr, usize};
 use std::sync::Arc;
 use std::sync::atomic::{self, AtomicUsize, Ordering};
+pub use reset::Reset;
+
+mod reset;
 
 /// A pool of reusable values
 pub struct Pool<T> {
@@ -85,7 +88,10 @@ impl<T> Pool<T> {
 
     /// Checkout a value from the pool. Returns `None` if the pool is currently
     /// at capacity.
-    pub fn checkout(&mut self) -> Option<Checkout<T>> {
+    ///
+    /// The value returned from the pool has not been reset and contains the
+    /// state that it previously had when it was last released.
+    pub fn checkout_raw(&mut self) -> Option<Checkout<T>> {
         self.inner_mut().checkout()
             .map(|ptr| {
                 Checkout {
@@ -97,6 +103,22 @@ impl<T> Pool<T> {
 
     fn inner_mut(&self) -> &mut PoolInner<T> {
         unsafe { mem::transmute(&*self.inner) }
+    }
+}
+
+impl <T: Reset> Pool<T> {
+    /// Checkout a value from the pool.  Returns `None` if the pool is currently
+    /// at capacity.
+    ///
+    /// The value returned has been reset to its empty state.
+    pub fn checkout(&mut self) -> Option<Checkout<T>> {
+        match self.checkout_raw() {
+            Some(mut obj) => {
+                obj.reset();
+                Some(obj)
+            }
+            None => None
+        }
     }
 }
 
