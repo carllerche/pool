@@ -1,20 +1,20 @@
 extern crate pool;
 
-use pool::Pool;
+use pool::{Pool, Dirty};
 
 #[test]
 pub fn test_checkout_checkin() {
-    let mut pool: Pool<i32> = Pool::with_capacity(10, 0, || 0);
+    let mut pool: Pool<Dirty<i32>> = Pool::with_capacity(10, 0, || Dirty(0));
 
-    let mut val = pool.checkout_raw().unwrap();
-    assert_eq!(*val, 0);
+    let mut val = pool.checkout().unwrap();
+    assert_eq!(**val, 0);
 
     // Update the value & return to the pool
-    *val = 1;
+    *val = Dirty(1);
     drop(val);
 
-    let val = pool.checkout_raw().unwrap();
-    assert_eq!(*val, 1);
+    let val = pool.checkout().unwrap();
+    assert_eq!(**val, 1);
 }
 
 #[test]
@@ -25,7 +25,7 @@ pub fn test_multiple_checkouts() {
     let mut vec = vec![];
 
     for _ in 0..10 {
-        let mut i = pool.checkout_raw().unwrap();
+        let mut i = pool.checkout().unwrap();
         assert_eq!(*i, 0);
         *i = 1;
         vec.push(i);
@@ -39,12 +39,12 @@ pub fn test_depleting_pool() {
     let mut vec = vec![];
 
     for _ in 0..5 {
-        vec.push(pool.checkout_raw().unwrap());
+        vec.push(pool.checkout().unwrap());
     }
 
-    assert!(pool.checkout_raw().is_none());
+    assert!(pool.checkout().is_none());
     drop(vec);
-    assert!(pool.checkout_raw().is_some());
+    assert!(pool.checkout().is_some());
 }
 
 #[test]

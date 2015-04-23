@@ -1,47 +1,40 @@
-use std::collections::*;
+use std::default::Default;
+use std::ops::{Deref, DerefMut};
 
-/// Resetting an object that acts like a collection clears the contents of
-/// that collection and makes it so that collection behaves like it was not
-/// used before.
+#[derive(Debug)]
+pub struct Dirty<T>(pub T);
+
+impl <T> Reset for Dirty<T> {
+    fn reset(&mut self) {
+        // Do nothing!
+    }
+}
+
+unsafe impl <T: Send> Send for Dirty<T> {}
+unsafe impl <T: Sync> Sync for Dirty<T> {}
+
+impl <T> Deref for Dirty<T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        &self.0
+    }
+}
+
+impl <T> DerefMut for Dirty<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.0
+    }
+}
+
+/// Resetting an object reverts that object back to a default state.
 pub trait Reset {
     fn reset(&mut self);
 }
 
-impl <T> Reset for Vec<T> {
+// For most of the stdlib collections, this will "clear" the collection
+// without deallocating.
+impl <T: Default + Clone> Reset for T {
     fn reset(&mut self) {
-        self.clear();
+        self.clone_from(&Default::default());
     }
 }
-
-impl <T: Ord> Reset for BinaryHeap<T> {
-    fn reset(&mut self) {
-        self.clear();
-    }
-}
-
-impl <T> Reset for LinkedList<T> {
-    fn reset(&mut self) {
-        self.clear();
-    }
-}
-
-impl <T> Reset for VecDeque<T> {
-    fn reset(&mut self) {
-        self.clear();
-    }
-}
-
-impl Reset for String {
-    fn reset(&mut self) {
-        self.clear();
-    }
-}
-
-// TODO: uncomment when VecMap becomes stable
-/*
-impl <T> Reset for VecMap<T> {
-    fn reset(&mut self) {
-        self.clear();
-    }
-}
-*/
