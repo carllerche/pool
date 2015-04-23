@@ -1,20 +1,20 @@
 extern crate pool;
 
-use pool::Pool;
+use pool::{Pool, Dirty};
 
 #[test]
 pub fn test_checkout_checkin() {
-    let mut pool: Pool<i32> = Pool::with_capacity(10, 0, || 0);
+    let mut pool: Pool<Dirty<i32>> = Pool::with_capacity(10, 0, || Dirty(0));
 
     let mut val = pool.checkout().unwrap();
-    assert_eq!(*val, 0);
+    assert_eq!(**val, 0);
 
     // Update the value & return to the pool
-    *val = 1;
+    *val = Dirty(1);
     drop(val);
 
     let val = pool.checkout().unwrap();
-    assert_eq!(*val, 1);
+    assert_eq!(**val, 1);
 }
 
 #[test]
@@ -45,6 +45,20 @@ pub fn test_depleting_pool() {
     assert!(pool.checkout().is_none());
     drop(vec);
     assert!(pool.checkout().is_some());
+}
+
+#[test]
+pub fn test_resetting_pool() {
+    let mut pool: Pool<Vec<i32>> = Pool::with_capacity(1, 0, || Vec::new());
+    {
+        let mut val = pool.checkout().unwrap();
+        val.push(5);
+        val.push(6);
+    }
+    {
+        let val = pool.checkout().unwrap();
+        assert!(val.len() == 0);
+    }
 }
 
 // TODO: Add concurrency stress tests

@@ -8,10 +8,10 @@
 //! Example:
 //!
 //! ```
-//! use pool::Pool;
+//! use pool::{Pool, Dirty};
 //! use std::thread;
 //!
-//! let mut pool = Pool::with_capacity(20, 0, || Vec::with_capacity(16_384));
+//! let mut pool = Pool::with_capacity(20, 0, || Dirty(Vec::with_capacity(16_384)));
 //!
 //! let mut vec = pool.checkout().unwrap();
 //!
@@ -54,13 +54,16 @@
 use std::{mem, ops, ptr, usize};
 use std::sync::Arc;
 use std::sync::atomic::{self, AtomicUsize, Ordering};
+pub use reset::{Reset, Dirty};
+
+mod reset;
 
 /// A pool of reusable values
-pub struct Pool<T> {
+pub struct Pool<T: Reset> {
     inner: Arc<PoolInner<T>>,
 }
 
-impl<T> Pool<T> {
+impl<T: Reset> Pool<T> {
     /// Creates a new pool that can contain up to `capacity` entries as well as
     /// `extra` extra bytes. Initializes each entry with the given function.
     pub fn with_capacity<F>(count: usize, mut extra: usize, init: F) -> Pool<T>
@@ -85,6 +88,9 @@ impl<T> Pool<T> {
 
     /// Checkout a value from the pool. Returns `None` if the pool is currently
     /// at capacity.
+    ///
+    /// The value returned from the pool has not been reset and contains the
+    /// state that it previously had when it was last released.
     pub fn checkout(&mut self) -> Option<Checkout<T>> {
         self.inner_mut().checkout()
             .map(|ptr| {
@@ -92,6 +98,9 @@ impl<T> Pool<T> {
                     entry: ptr,
                     pool: self.inner.clone(),
                 }
+            }).map(|mut checkout| {
+                checkout.reset();
+                checkout
             })
     }
 
