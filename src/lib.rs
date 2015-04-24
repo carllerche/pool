@@ -16,13 +16,13 @@
 //! let mut vec = pool.checkout().unwrap();
 //!
 //! // Do some work with the value, this can happen in another thread
-//! thread::scoped(move || {
+//! thread::spawn(move || {
 //!     for i in 0..10_000 {
 //!         vec.push(i);
 //!     }
 //!
 //!     assert_eq!(10_000, vec.len());
-//! });
+//! }).join();
 //!
 //! // The vec will have been returned to the pool by now
 //! let vec = pool.checkout().unwrap();
@@ -52,12 +52,13 @@
 //! The easiest way to have a single pool shared across many threads would be
 //! to wrap `Pool` in a mutex.
 use std::{mem, ops, ptr, usize};
+use std::cell::UnsafeCell;
 use std::sync::Arc;
 use std::sync::atomic::{self, AtomicUsize, Ordering};
 
 /// A pool of reusable values
 pub struct Pool<T> {
-    inner: Arc<PoolInner<T>>,
+    inner: Arc<UnsafeCell<PoolInner<T>>>,
 }
 
 impl<T> Pool<T> {
@@ -80,7 +81,7 @@ impl<T> Pool<T> {
             }
         }
 
-        Pool { inner: Arc::new(inner) }
+        Pool { inner: Arc::new(UnsafeCell::new(inner)) }
     }
 
     /// Checkout a value from the pool. Returns `None` if the pool is currently
@@ -90,13 +91,13 @@ impl<T> Pool<T> {
             .map(|ptr| {
                 Checkout {
                     entry: ptr,
-                    pool: self.inner.clone(),
+                    inner: self.inner.clone(),
                 }
             })
     }
 
     fn inner_mut(&self) -> &mut PoolInner<T> {
-        unsafe { mem::transmute(&*self.inner) }
+        unsafe { mem::transmute(self.inner.get()) }
     }
 }
 
@@ -106,7 +107,7 @@ unsafe impl<T: Send> Send for Pool<T> { }
 /// be returned to the pool.
 pub struct Checkout<T> {
     entry: *mut Entry<T>,
-    pool: Arc<PoolInner<T>>,
+    inner: Arc<UnsafeCell<PoolInner<T>>>,
 }
 
 impl<T> Checkout<T> {
@@ -127,6 +128,10 @@ impl<T> Checkout<T> {
     fn entry_mut(&self) -> &mut Entry<T> {
         unsafe { mem::transmute(self.entry) }
     }
+
+    fn inner(&self) -> &mut PoolInner<T> {
+        unsafe { mem::transmute(self.inner.get()) }
+    }
 }
 
 impl<T> ops::Deref for Checkout<T> {
@@ -145,7 +150,7 @@ impl<T> ops::DerefMut for Checkout<T> {
 
 impl<T> Drop for Checkout<T> {
     fn drop(&mut self) {
-        self.pool.checkin(self.entry);
+        self.inner().checkin(self.entry);
     }
 }
 
