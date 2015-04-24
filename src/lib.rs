@@ -74,10 +74,12 @@ impl<T> Pool<T> {
 
         // Initialize the entries
         for i in 0..count {
-            *inner.entry_mut(i) = Entry {
-                data: init(),
-                next: i + 1,
-                extra: extra,
+            unsafe {
+                ptr::write(inner.entry_mut(i), Entry {
+                    data: init(),
+                    next: i + 1,
+                    extra: extra,
+                });
             }
         }
 
@@ -286,6 +288,16 @@ impl<T> PoolInner<T> {
 
     fn entry_mut(&mut self, idx: usize) -> &mut Entry<T> {
         unsafe { mem::transmute(self.entry(idx)) }
+    }
+}
+
+impl<T> Drop for PoolInner<T> {
+    fn drop(&mut self) {
+        for i in 0..self.count {
+            unsafe {
+                let _ = ptr::read(self.entry(i));
+            }
+        }
     }
 }
 

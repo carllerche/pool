@@ -47,4 +47,17 @@ pub fn test_depleting_pool() {
     assert!(pool.checkout().is_some());
 }
 
+struct Zomg;
+
+impl Drop for Zomg {
+    fn drop(&mut self) {
+        println!("Dropping");
+    }
+}
+
+#[test]
+pub fn test_works_with_drop_types() {
+    let _ = pool::Pool::with_capacity(1, 0, || Zomg);
+}
+
 // TODO: Add concurrency stress tests
