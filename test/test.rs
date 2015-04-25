@@ -75,4 +75,10 @@ pub fn test_works_with_drop_types() {
     let _ = pool::Pool::with_capacity(1, 0, || Zomg);
 }
 
+#[test]
+#[should_panic]
+pub fn test_safe_when_init_panics() {
+    let _ = pool::Pool::<Zomg>::with_capacity(1, 0, || panic!("oops"));
+}
+
 // TODO: Add concurrency stress tests

@@ -84,6 +84,7 @@ impl<T: Reset> Pool<T> {
                     extra: extra,
                 });
             }
+            inner.init += 1;
         }
 
         Pool { inner: Arc::new(UnsafeCell::new(inner)) }
@@ -173,6 +174,7 @@ struct PoolInner<T> {
     memory: Box<[u8]>,  // Ownership of raw memory
     next: AtomicUsize,  // Offset to next available value
     ptr: *mut Entry<T>, // Pointer to first entry
+    init: usize,        // Number of initialized entries
     count: usize,       // Total number of entries
     entry_size: usize,  // Byte size of each entry
 }
@@ -225,6 +227,7 @@ impl<T> PoolInner<T> {
             memory: memory,
             next: AtomicUsize::new(0),
             ptr: ptr as *mut Entry<T>,
+            init: 0,
             count: count,
             entry_size: entry_size,
         }
@@ -302,7 +305,7 @@ impl<T> PoolInner<T> {
 
 impl<T> Drop for PoolInner<T> {
     fn drop(&mut self) {
-        for i in 0..self.count {
+        for i in 0..self.init {
             unsafe {
                 let _ = ptr::read(self.entry(i));
             }
