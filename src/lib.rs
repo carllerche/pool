@@ -129,7 +129,7 @@ impl<T> Checkout<T> {
     }
 
     /// Write access to the extra bytes
-    pub fn extra_mut(&self) -> &mut [u8] {
+    pub fn extra_mut(&mut self) -> &mut [u8] {
         self.entry_mut().extra_mut()
     }
 
@@ -137,7 +137,7 @@ impl<T> Checkout<T> {
         unsafe { mem::transmute(self.entry) }
     }
 
-    fn entry_mut(&self) -> &mut Entry<T> {
+    fn entry_mut(&mut self) -> &mut Entry<T> {
         unsafe { mem::transmute(self.entry) }
     }
 
@@ -298,6 +298,7 @@ impl<T> PoolInner<T> {
         }
     }
 
+    #[allow(mutable_transmutes)]
     fn entry_mut(&mut self, idx: usize) -> &mut Entry<T> {
         unsafe { mem::transmute(self.entry(idx)) }
     }
@@ -331,6 +332,7 @@ impl<T> Entry<T> {
         }
     }
 
+    #[allow(mutable_transmutes)]
     fn extra_mut(&mut self) -> &mut [u8] {
         unsafe { mem::transmute(self.extra()) }
     }

@@ -18,7 +18,7 @@ To use `pool`, first add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-pool = "0.1.1"
+pool = "0.1.3"
 ```
 
 Then, add this to your crate root:
