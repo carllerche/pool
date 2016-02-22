@@ -113,7 +113,7 @@ impl<T: Reset> Pool<T> {
     }
 }
 
-unsafe impl<T: Send> Send for Pool<T> { }
+unsafe impl<T: Send + Reset> Send for Pool<T> { }
 
 /// A handle to a checked out value. When dropped out of scope, the value will
 /// be returned to the pool.
