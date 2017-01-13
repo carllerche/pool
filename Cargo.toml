@@ -1,7 +1,7 @@
 [package]
 
 name          = "pool"
-version       = "0.1.3"
+version       = "0.1.4"
 license       = "MIT"
 authors       = ["Carl Lerche <me@carllerche.com>"]
 description   = "A pool of reusable values"
