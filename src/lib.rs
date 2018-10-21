@@ -293,7 +293,7 @@ impl<T> PoolInner<T> {
     fn entry(&self, idx: usize) -> &Entry<T> {
         unsafe {
             debug_assert!(idx < self.count, "invalid index");
-            let ptr = self.ptr.offset(idx as isize);
+            let ptr = (self.ptr as *mut u8).offset((idx * self.entry_size) as isize) as *mut Entry<T>;
             mem::transmute(ptr)
         }
     }
