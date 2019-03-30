@@ -8,6 +8,10 @@ impl <T> Reset for Dirty<T> {
     fn reset_on_checkout(&mut self) {
         // Do nothing!
     }
+
+    fn reset_on_checkin(&mut self) {
+        ();
+    }
 }
 
 unsafe impl <T: Send> Send for Dirty<T> {}
@@ -29,12 +33,18 @@ impl <T> DerefMut for Dirty<T> {
 /// Resetting an object reverts that object back to a default state.
 pub trait Reset {
     fn reset_on_checkout(&mut self);
+    fn reset_on_checkin(&mut self);
 }
 
-// For most of the stdlib collections, this will "clear" the collection
-// without deallocating.
+/// Default catch-all types behaviour for `Reset`: perform reset during checkout only.
 impl <T: Default + Clone> Reset for T {
     fn reset_on_checkout(&mut self) {
+        // For most of the stdlib collections, this will "clear" the collection
+        // without deallocating.
         self.clone_from(&Default::default());
+    }
+
+    fn reset_on_checkin(&mut self) {
+        ();
     }
 }
