@@ -2,6 +2,7 @@ use std::default::Default;
 use std::ops::{Deref, DerefMut};
 
 #[derive(Debug)]
+/// Implements the `Reset` trait which resets nothing.
 pub struct Dirty<T>(pub T);
 
 impl <T> Reset for Dirty<T> {
@@ -26,6 +27,32 @@ impl <T> Deref for Dirty<T> {
 
 impl <T> DerefMut for Dirty<T> {
     fn deref_mut(&mut self) -> &mut T {
+        &mut self.0
+    }
+}
+
+pub struct ResetOnCheckin<T: Default + Clone>(pub T);
+
+impl<T: Default + Clone> Reset for ResetOnCheckin<T> {
+    fn reset_on_checkout(&mut self) {
+        ();
+    }
+
+    fn reset_on_checkin(&mut self) {
+        self.clone_from(&Default::default());
+    }
+}
+
+impl<T: Default + Clone> Deref for ResetOnCheckin<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T: Default + Clone> DerefMut for ResetOnCheckin<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }

@@ -55,7 +55,7 @@ use std::{mem, ops, ptr, usize};
 use std::cell::UnsafeCell;
 use std::sync::Arc;
 use std::sync::atomic::{self, AtomicUsize, Ordering};
-pub use reset::{Reset, Dirty};
+pub use reset::{Reset, Dirty, ResetOnCheckin};
 
 mod reset;
 
