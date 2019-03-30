@@ -103,7 +103,7 @@ impl<T: Reset> Pool<T> {
                     inner: self.inner.clone(),
                 }
             }).map(|mut checkout| {
-                checkout.reset();
+                checkout.reset_on_checkout();
                 checkout
             })
     }

@@ -5,7 +5,7 @@ use std::ops::{Deref, DerefMut};
 pub struct Dirty<T>(pub T);
 
 impl <T> Reset for Dirty<T> {
-    fn reset(&mut self) {
+    fn reset_on_checkout(&mut self) {
         // Do nothing!
     }
 }
@@ -28,13 +28,13 @@ impl <T> DerefMut for Dirty<T> {
 
 /// Resetting an object reverts that object back to a default state.
 pub trait Reset {
-    fn reset(&mut self);
+    fn reset_on_checkout(&mut self);
 }
 
 // For most of the stdlib collections, this will "clear" the collection
 // without deallocating.
 impl <T: Default + Clone> Reset for T {
-    fn reset(&mut self) {
+    fn reset_on_checkout(&mut self) {
         self.clone_from(&Default::default());
     }
 }
