@@ -263,14 +263,9 @@ impl<T> PoolInner<T> {
     }
 
     fn checkin(&self, ptr: *mut Entry<T>) {
-        let mut idx;
-        let mut entry: &mut Entry<T>;
-
-        unsafe {
-            // Figure out the index
-            idx = ((ptr as usize) - (self.ptr as usize)) / self.entry_size;
-            entry = mem::transmute(ptr);
-        }
+        // Figure out the index
+        let idx = ((ptr as usize) - (self.ptr as usize)) / self.entry_size;
+        let entry: &mut Entry<T> = unsafe { mem::transmute(ptr) };
 
         debug_assert!(idx < self.count, "invalid index; idx={}", idx);
 
