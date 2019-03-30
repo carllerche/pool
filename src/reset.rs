@@ -36,7 +36,7 @@ pub trait Reset {
     fn reset_on_checkin(&mut self);
 }
 
-/// Default catch-all types behaviour for `Reset`: perform reset during checkout only.
+/// Default `Reset` behaviour for types which don't implement it: Reset only during checkout.
 impl <T: Default + Clone> Reset for T {
     fn reset_on_checkout(&mut self) {
         // For most of the stdlib collections, this will "clear" the collection

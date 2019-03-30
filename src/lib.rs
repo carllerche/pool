@@ -117,12 +117,12 @@ unsafe impl<T: Send + Reset> Send for Pool<T> { }
 
 /// A handle to a checked out value. When dropped out of scope, the value will
 /// be returned to the pool.
-pub struct Checkout<T> {
+pub struct Checkout<T: Reset> {
     entry: *mut Entry<T>,
     inner: Arc<UnsafeCell<PoolInner<T>>>,
 }
 
-impl<T> Checkout<T> {
+impl<T: Reset> Checkout<T> {
     /// Read access to the raw bytes
     pub fn extra(&self) -> &[u8] {
         self.entry().extra()
@@ -146,7 +146,7 @@ impl<T> Checkout<T> {
     }
 }
 
-impl<T> ops::Deref for Checkout<T> {
+impl<T: Reset> ops::Deref for Checkout<T> {
     type Target = T;
 
     fn deref(&self) -> &T {
@@ -154,20 +154,21 @@ impl<T> ops::Deref for Checkout<T> {
     }
 }
 
-impl<T> ops::DerefMut for Checkout<T> {
+impl<T: Reset> ops::DerefMut for Checkout<T> {
     fn deref_mut(&mut self) -> &mut T {
         &mut self.entry_mut().data
     }
 }
 
-impl<T> Drop for Checkout<T> {
+impl<T: Reset> Drop for Checkout<T> {
     fn drop(&mut self) {
+        self.reset_on_checkin();
         self.inner().checkin(self.entry);
     }
 }
 
-unsafe impl<T: Send> Send for Checkout<T> { }
-unsafe impl<T: Sync> Sync for Checkout<T> { }
+unsafe impl<T: Send + Reset> Send for Checkout<T> { }
+unsafe impl<T: Sync + Reset> Sync for Checkout<T> { }
 
 struct PoolInner<T> {
     #[allow(dead_code)]
