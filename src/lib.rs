@@ -359,3 +359,64 @@ fn alloc(mut size: usize, align: usize) -> (Box<[u8]>, *mut u8) {
         (mem, ptr)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::mem;
+    use Pool;
+    use ResetOnCheckin;
+    use Entry;
+
+    #[test]
+    fn test_reset_on_checkin() {
+        let mut pool: Pool<ResetOnCheckin<i32>> = Pool::with_capacity(1, 0, || ResetOnCheckin(0));
+
+        let mut val = pool.checkout().unwrap();
+        assert_eq!(0, **val);
+
+        // Update the value & return to the pool. Should be reset to 0 before it is returned to the
+        // pool.
+        **val = 1;
+        assert_eq!(1, **val);
+        drop(val);
+
+        // Make sure that the value was reset to default value.
+        let entry = pool.inner_mut().checkout().unwrap();
+        let entry: &mut Entry<ResetOnCheckin<i32>> = unsafe { mem::transmute(entry) };
+        assert_eq!(0, entry.data.0);
+
+        // Update the value & return the entry to the inner pool. Afterwards checkout (normally) and
+        // make sure that the value was not changed.
+        entry.data.0 = 2;
+        pool.inner_mut().checkin(entry);
+
+        let val = pool.checkout().unwrap();
+        assert_eq!(2, **val);
+    }
+
+    #[test]
+    fn test_reset_on_checkout() {
+        let mut pool: Pool<i32> = Pool::with_capacity(1, 0, || 0);
+
+        let mut val = pool.checkout().unwrap();
+        assert_eq!(0, *val);
+
+        // Update the value & return to the pool. Should not be reset to 0 before it is returned to
+        // the pool.
+        *val = 1;
+        assert_eq!(1, *val);
+        drop(val);
+
+        // Make sure that the value was NOT reset to default value.
+        let entry = pool.inner_mut().checkout().unwrap();
+        let entry: &mut Entry<i32> = unsafe { mem::transmute(entry) };
+        assert_eq!(1, entry.data);
+
+        // Return the entry to the inner pool. Afterwards checkout (normally) and make sure that the
+        // value was reset to the default.
+        pool.inner_mut().checkin(entry);
+
+        let val = pool.checkout().unwrap();
+        assert_eq!(0, *val);
+    }
+}
