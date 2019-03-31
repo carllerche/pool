@@ -55,7 +55,7 @@ use std::{mem, ops, ptr, usize};
 use std::cell::UnsafeCell;
 use std::sync::Arc;
 use std::sync::atomic::{self, AtomicUsize, Ordering};
-pub use reset::{Reset, Dirty};
+pub use reset::{Reset, Dirty, ResetOnCheckin};
 
 mod reset;
 
@@ -103,7 +103,7 @@ impl<T: Reset> Pool<T> {
                     inner: self.inner.clone(),
                 }
             }).map(|mut checkout| {
-                checkout.reset();
+                checkout.reset_on_checkout();
                 checkout
             })
     }
@@ -117,12 +117,12 @@ unsafe impl<T: Send + Reset> Send for Pool<T> { }
 
 /// A handle to a checked out value. When dropped out of scope, the value will
 /// be returned to the pool.
-pub struct Checkout<T> {
+pub struct Checkout<T: Reset> {
     entry: *mut Entry<T>,
     inner: Arc<UnsafeCell<PoolInner<T>>>,
 }
 
-impl<T> Checkout<T> {
+impl<T: Reset> Checkout<T> {
     /// Read access to the raw bytes
     pub fn extra(&self) -> &[u8] {
         self.entry().extra()
@@ -146,7 +146,7 @@ impl<T> Checkout<T> {
     }
 }
 
-impl<T> ops::Deref for Checkout<T> {
+impl<T: Reset> ops::Deref for Checkout<T> {
     type Target = T;
 
     fn deref(&self) -> &T {
@@ -154,20 +154,21 @@ impl<T> ops::Deref for Checkout<T> {
     }
 }
 
-impl<T> ops::DerefMut for Checkout<T> {
+impl<T: Reset> ops::DerefMut for Checkout<T> {
     fn deref_mut(&mut self) -> &mut T {
         &mut self.entry_mut().data
     }
 }
 
-impl<T> Drop for Checkout<T> {
+impl<T: Reset> Drop for Checkout<T> {
     fn drop(&mut self) {
+        self.reset_on_checkin();
         self.inner().checkin(self.entry);
     }
 }
 
-unsafe impl<T: Send> Send for Checkout<T> { }
-unsafe impl<T: Sync> Sync for Checkout<T> { }
+unsafe impl<T: Send + Reset> Send for Checkout<T> { }
+unsafe impl<T: Sync + Reset> Sync for Checkout<T> { }
 
 struct PoolInner<T> {
     #[allow(dead_code)]
@@ -263,14 +264,9 @@ impl<T> PoolInner<T> {
     }
 
     fn checkin(&self, ptr: *mut Entry<T>) {
-        let mut idx;
-        let mut entry: &mut Entry<T>;
-
-        unsafe {
-            // Figure out the index
-            idx = ((ptr as usize) - (self.ptr as usize)) / self.entry_size;
-            entry = mem::transmute(ptr);
-        }
+        // Figure out the index
+        let idx = ((ptr as usize) - (self.ptr as usize)) / self.entry_size;
+        let entry: &mut Entry<T> = unsafe { mem::transmute(ptr) };
 
         debug_assert!(idx < self.count, "invalid index; idx={}", idx);
 
@@ -361,5 +357,66 @@ fn alloc(mut size: usize, align: usize) -> (Box<[u8]>, *mut u8) {
         }
 
         (mem, ptr)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::mem;
+    use Pool;
+    use ResetOnCheckin;
+    use Entry;
+
+    #[test]
+    fn test_reset_on_checkin() {
+        let mut pool: Pool<ResetOnCheckin<i32>> = Pool::with_capacity(1, 0, || ResetOnCheckin(0));
+
+        let mut val = pool.checkout().unwrap();
+        assert_eq!(0, **val);
+
+        // Update the value & return to the pool. Should be reset to 0 before it is returned to the
+        // pool.
+        **val = 1;
+        assert_eq!(1, **val);
+        drop(val);
+
+        // Make sure that the value was reset to default value.
+        let entry = pool.inner_mut().checkout().unwrap();
+        let entry: &mut Entry<ResetOnCheckin<i32>> = unsafe { mem::transmute(entry) };
+        assert_eq!(0, entry.data.0);
+
+        // Update the value & return the entry to the inner pool. Afterwards checkout (normally) and
+        // make sure that the value was not changed.
+        entry.data.0 = 2;
+        pool.inner_mut().checkin(entry);
+
+        let val = pool.checkout().unwrap();
+        assert_eq!(2, **val);
+    }
+
+    #[test]
+    fn test_reset_on_checkout() {
+        let mut pool: Pool<i32> = Pool::with_capacity(1, 0, || 0);
+
+        let mut val = pool.checkout().unwrap();
+        assert_eq!(0, *val);
+
+        // Update the value & return to the pool. Should not be reset to 0 before it is returned to
+        // the pool.
+        *val = 1;
+        assert_eq!(1, *val);
+        drop(val);
+
+        // Make sure that the value was NOT reset to default value.
+        let entry = pool.inner_mut().checkout().unwrap();
+        let entry: &mut Entry<i32> = unsafe { mem::transmute(entry) };
+        assert_eq!(1, entry.data);
+
+        // Return the entry to the inner pool. Afterwards checkout (normally) and make sure that the
+        // value was reset to the default.
+        pool.inner_mut().checkin(entry);
+
+        let val = pool.checkout().unwrap();
+        assert_eq!(0, *val);
     }
 }
